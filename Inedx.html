@@ -2,273 +2,157 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>الموقع الأكاديمي للفهرسة والبحث</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الموقع الأكاديمي المتكامل</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
-        :root { --primary: #2c3e50; --secondary: #34495e; --accent: #27ae60; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
-        .container { max-width: 1000px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .nav-buttons { margin-bottom: 20px; display: flex; gap: 10px; }
-        button { padding: 10px 20px; cursor: pointer; border: none; border-radius: 4px; transition: 0.3s; background: var(--primary); color: white; }
-        button:hover { opacity: 0.8; }
-        .search-section, .input-section { display: none; }
-        .active { display: block; }
-        input, textarea { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: right; }
-        th { background-color: var(--secondary); color: white; }
-        .marc-output { background: #eee; padding: 15px; border-right: 5px solid var(--accent); white-space: pre-wrap; font-family: monospace; }
-        .btn-delete { background: #e74c3c; }
+        :root { --primary: #2c3e50; --accent: #27ae60; --danger: #c0392b; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #ecf0f1; margin: 0; padding: 20px; text-align: right; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .tabs { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 20px; }
+        .tab { padding: 10px 25px; cursor: pointer; border: none; background: none; font-weight: bold; font-size: 16px; }
+        .tab.active { color: var(--accent); border-bottom: 3px solid var(--accent); }
+        .content-section { display: none; }
+        .active-section { display: block; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        .btn-group { display: flex; gap: 10px; margin-top: 15px; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 5px; color: white; cursor: pointer; font-size: 15px; transition: 0.3s; }
+        .btn-search { background: var(--primary); }
+        .btn-start { background: #2980b9; }
+        .btn-clear { background: var(--danger); }
         .btn-export { background: var(--accent); }
+        #resultsTable { width: 100%; margin-top: 20px; border-collapse: collapse; overflow-x: auto; display: block; }
+        #resultsTable th, #resultsTable td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        #resultsTable th { background: #f8f9fa; }
+        .marc-preview { background: #2d3436; color: #dfe6e9; padding: 15px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; margin-top: 15px; direction: ltr; text-align: left; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="nav-buttons">
-        <button onclick="showSection('search')">شاشة البحث</button>
-        <button onclick="showSection('input')">إدخال بطاقة جديدة (MARC)</button>
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab(event, 'searchPage')">البحث الأكاديمي</button>
+        <button class="tab" onclick="switchTab(event, 'inputPage')">إدخال بطاقة MARC</button>
     </div>
 
-    <div id="searchSection" class="search-section active">
-        <h2>البحث الأكاديمي في ملف Excel</h2>
-        <input type="file" id="uploadExcel" accept=".xlsx, .xls">
-        <input type="text" id="searchInput" placeholder="ابحث هنا...">
-        <div style="display: flex; gap: 10px;">
-            <button onclick="processSearch('contains')">يحتوي على</button>
-            <button onclick="processSearch('starts')">يبدأ بـ</button>
-            <button class="btn-delete" onclick="resetSearch()">مسح النتائج والعودة</button>
+    <div id="searchPage" class="content-section active-section">
+        <h3>1. تحميل الملف والبحث</h3>
+        <input type="file" id="excelInput" accept=".xlsx, .xls" style="margin-bottom: 15px;">
+        <input type="text" id="searchTerm" placeholder="أدخل كلمة البحث...">
+        
+        <div class="btn-group">
+            <button class="btn-search" onclick="runSearch('contains')">بحث (يحتوي على)</button>
+            <button class="btn-start" onclick="runSearch('starts')">بحث (يبدأ بـ)</button>
+            <button class="btn-clear" onclick="clearAll()">مسح النتائج والعودة</button>
         </div>
-        <div id="results"></div>
-    </div>
 
-    <div id="inputSection" class="input-section">
-        <h2>إدخال بطاقة فهرسة جديدة</h2>
-        <div id="entryForm">
-            <input type="text" id="m020" placeholder="الرقم المعياري ISBN (020)">
-            <input type="text" id="m100" placeholder="المؤلف (100)">
-            <input type="text" id="m245" placeholder="العنوان (245)">
-            <input type="text" id="m260" placeholder="بيانات النشر (260)">
-            <button onclick="convertToMARC()">تحويل إلى صيغة MARC</button>
-        </div>
-        <div id="marcResult" style="margin-top:20px; display:none;">
-            <h3>نتائج تحويل MARC 21:</h3>
-            <div class="marc-output" id="marcText"></div>
-            <button class="btn-export" onclick="exportMARC()">تصدير البطاقة (TXT)</button>
+        <div id="tableContainer">
+            <table id="resultsTable"></table>
         </div>
     </div>
-</div>
 
-<script>
-    let excelData = [];
+    <div id="inputPage" class="content-section">
+        <h3>2. فهرسة بطاقة جديدة (MARC 21)</h3>
+        <div class="form-group"><label>العنوان الرئيسي (245):</label><input type="text" id="titleField"></div>
+        <div class="form-group"><label>اسم المؤلف (100):</label><input type="text" id="authorField"></div>
+        <div class="form-group"><label>مكان وعام النشر (260):</label><input type="text" id="pubField"></div>
+        <div class="form-group"><label>الرقم المعياري ISBN (020):</label><input type="text" id="isbnField"></div>
+        <div class="form-group"><label>رقم التصنيف (082):</label><input type="text" id="classField"></div>
 
-    // وظيفة التنقل بين الصفحات
-    function showSection(section) {
-        document.querySelectorAll('.search-section, .input-section').forEach(s => s.classList.remove('active'));
-        if(section === 'search') document.getElementById('searchSection').classList.add('active');
-        else document.getElementById('inputSection').classList.add('active');
-    }
-
-    // قراءة ملف الإكسل
-    document.getElementById('uploadExcel').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const data = new Uint8Array(event.target.result);
-            const workbook = XLSX.read(data, {type: 'array'});
-            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            excelData = XLSX.utils.sheet_to_json(firstSheet);
-            alert("تم تحميل ملف الإكسل بنجاح!");
-        };
-        reader.readAsArrayBuffer(file);
-    });
-
-    // منطق البحث
-    function processSearch(type) {
-        const term = document.getElementById('searchInput').value.toLowerCase();
-        if(!term) return alert("يرجى إدخال كلمة بحث");
-
-        const filtered = excelData.filter(row => {
-            return Object.values(row).some(val => {
-                const strVal = String(val).toLowerCase();
-                return type === 'contains' ? strVal.includes(term) : strVal.startsWith(term);
-            });
-        });
-        displayResults(filtered);
-    }
-
-    function displayResults(data) {
-        let html = `<table><tr>${Object.keys(excelData[0] || {}).map(k => `<th>${k}</th>`).join('')}</tr>`;
-        data.forEach(row => {
-            html += `<tr>${Object.values(row).map(v => `<td>${v}</td>`).join('')}</tr>`;
-        });
-        html += `</table>`;
-        document.getElementById('results').innerHTML = data.length ? html : "لا توجد نتائج.";
-    }
-
-    function resetSearch() {
-        document.getElementById('searchInput').value = '';
-        document.getElementById('results').innerHTML = '';
-        document.getElementById('uploadExcel').value = '';
-    }
-
-    // محول MARC وتصديره
-    function convertToMARC() {
-        const isbn = document.getElementById('m020').value;
-        const author = document.getElementById('m100').value;
-        const title = document.getElementById('m245').value;
-        const pub = document.getElementById('m260').value;
-
-        const marc = `LDR 00000nam a2200000 u 4500\n020 ## $a ${isbn}\n100 1# $a ${author}\n245 10 $a ${title}\n260 ## $a ${pub}`;
-        document.getElementById('marcText').innerText = marc;
-        document.getElementById('marcResult').style.display = 'block';
-    }
-
-    function exportMARC() {
-        const text = document.getElementById('marcText').innerText;
-        const blob = new Blob([text], {type: 'text/plain'});
-        const anchor = document.createElement('a');
-        anchor.download = 'marc_record.txt';
-        anchor.href = window.URL.createObjectURL(blob);
-        anchor.click();
-    }
-</script>
-
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <title>الموقع الأكاديمي للفهرسة والبحث</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        :root { --primary: #2c3e50; --secondary: #34495e; --accent: #27ae60; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
-        .container { max-width: 1000px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .nav-buttons { margin-bottom: 20px; display: flex; gap: 10px; }
-        button { padding: 10px 20px; cursor: pointer; border: none; border-radius: 4px; transition: 0.3s; background: var(--primary); color: white; }
-        button:hover { opacity: 0.8; }
-        .search-section, .input-section { display: none; }
-        .active { display: block; }
-        input, textarea { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: right; }
-        th { background-color: var(--secondary); color: white; }
-        .marc-output { background: #eee; padding: 15px; border-right: 5px solid var(--accent); white-space: pre-wrap; font-family: monospace; }
-        .btn-delete { background: #e74c3c; }
-        .btn-export { background: var(--accent); }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <div class="nav-buttons">
-        <button onclick="showSection('search')">شاشة البحث</button>
-        <button onclick="showSection('input')">إدخال بطاقة جديدة (MARC)</button>
-    </div>
-
-    <div id="searchSection" class="search-section active">
-        <h2>البحث الأكاديمي في ملف Excel</h2>
-        <input type="file" id="uploadExcel" accept=".xlsx, .xls">
-        <input type="text" id="searchInput" placeholder="ابحث هنا...">
-        <div style="display: flex; gap: 10px;">
-            <button onclick="processSearch('contains')">يحتوي على</button>
-            <button onclick="processSearch('starts')">يبدأ بـ</button>
-            <button class="btn-delete" onclick="resetSearch()">مسح النتائج والعودة</button>
+        <div class="btn-group">
+            <button class="btn-export" onclick="generateMARC()">تحويل وتصدير البطاقة</button>
         </div>
-        <div id="results"></div>
-    </div>
 
-    <div id="inputSection" class="input-section">
-        <h2>إدخال بطاقة فهرسة جديدة</h2>
-        <div id="entryForm">
-            <input type="text" id="m020" placeholder="الرقم المعياري ISBN (020)">
-            <input type="text" id="m100" placeholder="المؤلف (100)">
-            <input type="text" id="m245" placeholder="العنوان (245)">
-            <input type="text" id="m260" placeholder="بيانات النشر (260)">
-            <button onclick="convertToMARC()">تحويل إلى صيغة MARC</button>
-        </div>
-        <div id="marcResult" style="margin-top:20px; display:none;">
-            <h3>نتائج تحويل MARC 21:</h3>
-            <div class="marc-output" id="marcText"></div>
-            <button class="btn-export" onclick="exportMARC()">تصدير البطاقة (TXT)</button>
+        <div id="marcOutputArea" style="display:none;">
+            <h4>معاينة صيغة MARC:</h4>
+            <div class="marc-preview" id="marcContent"></div>
         </div>
     </div>
 </div>
 
 <script>
-    let excelData = [];
+    let dataStore = [];
 
-    // وظيفة التنقل بين الصفحات
-    function showSection(section) {
-        document.querySelectorAll('.search-section, .input-section').forEach(s => s.classList.remove('active'));
-        if(section === 'search') document.getElementById('searchSection').classList.add('active');
-        else document.getElementById('inputSection').classList.add('active');
+    // التبديل بين الصفحات
+    function switchTab(evt, sectionId) {
+        document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active-section'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById(sectionId).classList.add('active-section');
+        evt.currentTarget.classList.add('active');
     }
 
-    // قراءة ملف الإكسل
-    document.getElementById('uploadExcel').addEventListener('change', (e) => {
+    // قراءة ملف الإكسل عند اختياره
+    document.getElementById('excelInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = function(event) {
             const data = new Uint8Array(event.target.result);
             const workbook = XLSX.read(data, {type: 'array'});
-            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            excelData = XLSX.utils.sheet_to_json(firstSheet);
-            alert("تم تحميل ملف الإكسل بنجاح!");
+            const sheetName = workbook.SheetNames[0];
+            dataStore = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+            alert("تم قراءة الملف! عدد السجلات: " + dataStore.length);
         };
         reader.readAsArrayBuffer(file);
     });
 
-    // منطق البحث
-    function processSearch(type) {
-        const term = document.getElementById('searchInput').value.toLowerCase();
-        if(!term) return alert("يرجى إدخال كلمة بحث");
+    // وظيفة البحث
+    function runSearch(mode) {
+        const query = document.getElementById('searchTerm').value.trim().toLowerCase();
+        if (!query || dataStore.length === 0) {
+            alert("تأكد من تحميل ملف الإكسل وكتابة كلمة البحث");
+            return;
+        }
 
-        const filtered = excelData.filter(row => {
+        const filtered = dataStore.filter(row => {
             return Object.values(row).some(val => {
-                const strVal = String(val).toLowerCase();
-                return type === 'contains' ? strVal.includes(term) : strVal.startsWith(term);
+                const sVal = String(val).toLowerCase();
+                return mode === 'contains' ? sVal.includes(query) : sVal.startsWith(query);
             });
         });
-        displayResults(filtered);
+
+        renderTable(filtered);
     }
 
-    function displayResults(data) {
-        let html = `<table><tr>${Object.keys(excelData[0] || {}).map(k => `<th>${k}</th>`).join('')}</tr>`;
-        data.forEach(row => {
-            html += `<tr>${Object.values(row).map(v => `<td>${v}</td>`).join('')}</tr>`;
-        });
-        html += `</table>`;
-        document.getElementById('results').innerHTML = data.length ? html : "لا توجد نتائج.";
+    function renderTable(data) {
+        const table = document.getElementById('resultsTable');
+        table.innerHTML = "";
+        if (data.length === 0) { table.innerHTML = "<tr><td>لا توجد نتائج</td></tr>"; return; }
+
+        const headers = Object.keys(data[0]);
+        let headerRow = "<tr>" + headers.map(h => `<th>${h}</th>`).join('') + "</tr>";
+        let rows = data.map(r => "<tr>" + headers.map(h => `<td>${r[h] || ''}</td>`).join('') + "</tr>").join('');
+        
+        table.innerHTML = headerRow + rows;
     }
 
-    function resetSearch() {
-        document.getElementById('searchInput').value = '';
-        document.getElementById('results').innerHTML = '';
-        document.getElementById('uploadExcel').value = '';
+    // مسح النتائج
+    function clearAll() {
+        document.getElementById('searchTerm').value = "";
+        document.getElementById('resultsTable').innerHTML = "";
+        alert("تم مسح النتائج والعودة للوضع الرئيسي");
     }
 
-    // محول MARC وتصديره
-    function convertToMARC() {
-        const isbn = document.getElementById('m020').value;
-        const author = document.getElementById('m100').value;
-        const title = document.getElementById('m245').value;
-        const pub = document.getElementById('m260').value;
+    // توليد وتصدير MARC
+    function generateMARC() {
+        const t = document.getElementById('titleField').value;
+        const a = document.getElementById('authorField').value;
+        const p = document.getElementById('pubField').value;
+        const i = document.getElementById('isbnField').value;
+        const c = document.getElementById('classField').value;
 
-        const marc = `LDR 00000nam a2200000 u 4500\n020 ## $a ${isbn}\n100 1# $a ${author}\n245 10 $a ${title}\n260 ## $a ${pub}`;
-        document.getElementById('marcText').innerText = marc;
-        document.getElementById('marcResult').style.display = 'block';
-    }
+        const marcText = `000  00000nam a2200000 i 4500\n020  ## $a ${i}\n082  ## $a ${c}\n100  1# $a ${a}\n245  10 $a ${t}\n260  ## $b ${p}`;
+        
+        document.getElementById('marcContent').innerText = marcText;
+        document.getElementById('marcOutputArea').style.display = 'block';
 
-    function exportMARC() {
-        const text = document.getElementById('marcText').innerText;
-        const blob = new Blob([text], {type: 'text/plain'});
-        const anchor = document.createElement('a');
-        anchor.download = 'marc_record.txt';
-        anchor.href = window.URL.createObjectURL(blob);
-        anchor.click();
+        // تصدير الملف
+        const blob = new Blob([marcText], {type: 'text/plain'});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `بطاقة_فهرسة_${t}.txt`;
+        link.click();
     }
 </script>
 
